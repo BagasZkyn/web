@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { Logo } from '@/components/shared/Logo'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Menu, Home, Download, Info, Newspaper, Server, LogIn, UserPlus } from 'lucide-react'
+import { Menu, Home, Download, Info, Newspaper, Server, LogIn, UserPlus, ShieldCheck } from 'lucide-react'
 import { ThemeToggle } from '@/components/shared/ThemeToggle'
 
 export function Header() {
@@ -30,7 +30,11 @@ export function Header() {
     navItems.push({ href: '/auth/login', label: 'Login', icon: LogIn })
     navItems.push({ href: '/auth/register', label: 'Register', icon: UserPlus })
   }
-
+  
+  if (user?.user_metadata?.role === 'admin') {
+    navItems.push({ href: '/admin', label: 'Admin', icon: ShieldCheck })
+  }
+    
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
