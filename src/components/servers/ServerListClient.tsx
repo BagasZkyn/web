@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Search, Users, Wifi, MapPin, ServerIcon } from 'lucide-react';
+import { Search, Users, Wifi, MapPin, ServerIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useDebounce } from 'use-debounce';
 import { fetchServerByIp } from '@/app/servers/actions';
@@ -56,6 +56,8 @@ interface ServerListClientProps {
   initialServers: ServerInfo[];
 }
 
+const ITEMS_PER_PAGE = 20;
+
 export function ServerListClient({ initialServers }: ServerListClientProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
@@ -63,6 +65,7 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
   const [sortBy, setSortBy] = useState('default');
   const [processedServers, setProcessedServers] = useState<ServerInfo[]>([]);
   const [specificServerResult, setSpecificServerResult] = useState<ServerInfo | 'loading' | 'notfound' | 'error' | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     setProcessedServers(
@@ -77,6 +80,7 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
     const ipPortPattern = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$/;
     if (ipPortPattern.test(debouncedSearchTerm)) {
       setSpecificServerResult('loading');
+      setCurrentPage(1); // Reset page for specific IP search
       fetchServerByIp(debouncedSearchTerm).then(server => {
         if (server) {
           const serverWithProcessedFlag = {
@@ -95,7 +99,12 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
     }
   }, [debouncedSearchTerm]);
 
-  const displayedServers = useMemo(() => {
+  // Reset current page when filters or sort order change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, gamemodeFilter, sortBy]);
+
+  const filteredAndSortedServers = useMemo(() => {
     if (specificServerResult && typeof specificServerResult === 'object' && specificServerResult !== null) {
       return [specificServerResult];
     }
@@ -126,8 +135,27 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
     } else if (sortBy === 'nameZA') {
       servers.sort((a, b) => b.name.localeCompare(a.name));
     }
+    // If sortBy is 'default', original API order (or processedServers order) is maintained
     return servers;
   }, [processedServers, searchTerm, gamemodeFilter, sortBy, specificServerResult]);
+  
+  const totalPages = Math.ceil(filteredAndSortedServers.length / ITEMS_PER_PAGE);
+
+  // Adjust current page if it becomes out of bounds
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    } else if (totalPages === 0 && currentPage !== 1) { // If no results, go to page 1
+      setCurrentPage(1);
+    }
+  }, [totalPages, currentPage]);
+
+
+  const paginatedServers = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return filteredAndSortedServers.slice(startIndex, endIndex);
+  }, [filteredAndSortedServers, currentPage]);
 
   const uniqueGamemodes = useMemo(() => {
     const modes = new Set(initialServers.map(s => s.mode.trim()).filter(m => m));
@@ -141,13 +169,30 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
     if (typeof specificServerResult === 'object' && specificServerResult !== null) return `Menampilkan detail untuk server ${specificServerResult.ip}:${specificServerResult.port}.`;
     
     if (initialServers.length === 0) return "Tidak ada server yang ditemukan atau API tidak tersedia. Silakan coba lagi nanti.";
-    if (displayedServers.length === 0 && searchTerm) return "Tidak ada server yang cocok dengan kriteria pencarian/filter Anda.";
-    if (displayedServers.length === 0 && gamemodeFilter !== 'all') return "Tidak ada server yang cocok dengan filter gamemode Anda.";
-    if (initialServers.length >= 200 && displayedServers.length === initialServers.length && !searchTerm && gamemodeFilter === 'all') {
-      return `Menampilkan ${initialServers.length} server pertama dari API. Persempit pencarian atau gunakan filter untuk hasil yang lebih spesifik. Data diperbarui secara berkala.`;
+    
+    const totalFilteredCount = filteredAndSortedServers.length;
+    if (totalFilteredCount === 0) {
+      if (searchTerm || gamemodeFilter !== 'all') return "Tidak ada server yang cocok dengan kriteria pencarian/filter Anda.";
+      return "Tidak ada server untuk ditampilkan.";
     }
-    return `Menampilkan ${displayedServers.length} dari ${initialServers.length} server yang diambil. Data diperbarui secara berkala.`;
-  }, [specificServerResult, debouncedSearchTerm, initialServers.length, displayedServers.length, searchTerm, gamemodeFilter]);
+
+    const startNum = (currentPage - 1) * ITEMS_PER_PAGE + 1;
+    const endNum = Math.min(currentPage * ITEMS_PER_PAGE, totalFilteredCount);
+    
+    let captionText = `Menampilkan server ${startNum}-${endNum} dari ${totalFilteredCount}`;
+    if (totalFilteredCount !== initialServers.length && !searchTerm.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$/) && gamemodeFilter !=='all' && sortBy !== 'default') {
+      captionText += ` (hasil filter dari ${initialServers.length} total server yang diambil).`;
+    } else if (totalFilteredCount !== initialServers.length && searchTerm && !searchTerm.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$/)){
+       captionText += ` (hasil pencarian dari ${initialServers.length} total server yang diambil).`;
+    } else {
+      captionText += ` server.`;
+    }
+    captionText += " Data diperbarui secara berkala.";
+    return captionText;
+  }, [specificServerResult, debouncedSearchTerm, initialServers.length, filteredAndSortedServers.length, currentPage, searchTerm, gamemodeFilter, sortBy]);
+
+
+  const showPagination = totalPages > 1 && !(specificServerResult && typeof specificServerResult === 'object');
 
   return (
     <>
@@ -169,7 +214,11 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
           </div>
           <div className="space-y-1">
             <Label htmlFor="gamemode-filter" className="text-sm font-medium text-foreground/80">Filter Gamemode</Label>
-            <Select value={gamemodeFilter} onValueChange={setGamemodeFilter} disabled={specificServerResult !== null && typeof specificServerResult !== 'string'}>
+            <Select 
+              value={gamemodeFilter} 
+              onValueChange={setGamemodeFilter} 
+              disabled={!!(specificServerResult && typeof specificServerResult === 'object')}
+            >
               <SelectTrigger id="gamemode-filter">
                 <SelectValue placeholder="Semua Gamemode" />
               </SelectTrigger>
@@ -178,7 +227,7 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
                 {uniqueGamemodes.map(mode => (
                   <SelectItem key={mode} value={mode}>{mode}</SelectItem>
                 ))}
-                {uniqueGamemodes.length === 0 && (
+                {uniqueGamemodes.length === 0 && ( // Fallback if API fails or returns no modes
                   <>
                     <SelectItem value="Roleplay">Roleplay</SelectItem>
                     <SelectItem value="Freeroam">Freeroam</SelectItem>
@@ -189,7 +238,11 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
           </div>
           <div className="space-y-1">
             <Label htmlFor="sort-by" className="text-sm font-medium text-foreground/80">Urutkan Berdasarkan</Label>
-            <Select value={sortBy} onValueChange={setSortBy} disabled={specificServerResult !== null && typeof specificServerResult !== 'string'}>
+            <Select 
+              value={sortBy} 
+              onValueChange={setSortBy} 
+              disabled={!!(specificServerResult && typeof specificServerResult === 'object')}
+            >
               <SelectTrigger id="sort-by">
                 <SelectValue placeholder="Default" />
               </SelectTrigger>
@@ -218,8 +271,8 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {displayedServers.length > 0 ? (
-              displayedServers.map((server) => (
+            {paginatedServers.length > 0 ? (
+              paginatedServers.map((server) => (
                 <TableRow key={server.id} className="hover:bg-muted/50 transition-colors">
                   <TableCell className="text-center">
                     <Badge variant={server.isOnline ? "default" : "destructive"} className={server.isOnline ? "bg-green-500 hover:bg-green-600 text-white" : "bg-red-500 hover:bg-red-600 text-white"}>
@@ -264,6 +317,32 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
           <TableCaption>{tableCaption}</TableCaption>
         </Table>
       </div>
+      
+      {showPagination && (
+        <div className="flex items-center justify-between mt-6 p-4 border-t border-border">
+          <Button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            variant="outline"
+            size="sm"
+          >
+            <ChevronLeft className="mr-2 h-4 w-4" />
+            Sebelumnya
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Halaman {currentPage} dari {totalPages}
+          </span>
+          <Button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            variant="outline"
+            size="sm"
+          >
+            Berikutnya
+            <ChevronRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </>
   );
 }

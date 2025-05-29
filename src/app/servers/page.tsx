@@ -38,7 +38,8 @@ async function getServers(): Promise<ServerInfo[]> {
       };
     }).filter(Boolean) as ServerInfo[]; // Filter out any null entries from mapping
 
-    return serverList.slice(0, 200); // Limit to 200 servers for display initially
+    // Return all servers, pagination will be handled client-side
+    return serverList; 
   } catch (error) {
     console.error("Error fetching or processing server data:", error);
     return [];
