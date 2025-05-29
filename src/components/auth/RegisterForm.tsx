@@ -29,4 +29,4 @@ export default function RegisterForm() {
       <p className="text-sm text-center">Already have an account? <a className="text-blue-600" href="/auth/login">Login</a></p>
     </div>
   )
-    
+}
