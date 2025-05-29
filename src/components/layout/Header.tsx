@@ -1,9 +1,17 @@
 import Link from 'next/link';
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabaseClient'
 import { Logo } from '@/components/shared/Logo';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Menu, Home, Download, Info, Newspaper, Server, LogIn, UserPlus } from 'lucide-react';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
+
+const [user, setUser] = useState(null)
+
+useEffect(() => {
+  supabase.auth.getUser().then(({ data }) => setUser(data.user))
+}, [])
 
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
@@ -11,9 +19,15 @@ const navItems = [
   { href: '/about', label: 'About', icon: Info },
   { href: '/news', label: 'News', icon: Newspaper },
   { href: '/servers', label: 'Servers', icon: Server },
-  { href: '/auth/login', label: 'Login', icon: LogIn },       // ← Tambahkan ini
-  { href: '/auth/register', label: 'Register', icon: UserPlus }
-];
+]
+
+if (user) {
+  navItems.push({ href: '/profile', label: 'Account', icon: Info })
+} else {
+  navItems.push({ href: '/auth/login', label: 'Login', icon: LogIn })
+  navItems.push({ href: '/auth/register', label: 'Register', icon: UserPlus })
+}
+
 
 export function Header() {
   return (
