@@ -8,49 +8,49 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Search, Users, Wifi, MapPin, ServerIcon, ArrowUpDown } from 'lucide-react';
+import { Search, Users, Wifi, MapPin, ServerIcon } from 'lucide-react';
 import React, { useState, useMemo, useEffect } from 'react';
+import { useDebounce } from 'use-debounce';
+import { fetchServerByIp } from '@/app/servers/actions';
 
 function getCountryFlagEmoji(langCode: string): string {
   if (!langCode) return '🏳️';
   const code = langCode.toLowerCase().slice(0, 2);
-  // More comprehensive list based on common SA-MP server languages
   switch (code) {
-    case 'en': return '🇬🇧'; // English (UK often used for generic English)
-    case 'us': return '🇺🇸'; // English (US)
-    case 'de': return '🇩🇪'; // German
-    case 'ru': return '🇷🇺'; // Russian
-    case 'pl': return '🇵🇱'; // Polish
-    case 'pt': return '🇵🇹'; // Portuguese (Portugal)
-    case 'br': return '🇧🇷'; // Portuguese (Brazil)
-    case 'es': return '🇪🇸'; // Spanish
-    case 'it': return '🇮🇹'; // Italian
-    case 'fr': return '🇫🇷'; // French
-    case 'nl': return '🇳🇱'; // Dutch
-    case 'id': return '🇮🇩'; // Indonesian
-    case 'ro': return '🇷🇴'; // Romanian
-    case 'hu': return '🇭🇺'; // Hungarian
-    case 'lt': return '🇱🇹'; // Lithuanian
-    case 'cz': return '🇨🇿'; // Czech
-    case 'ar': return '🇸🇦'; // Arabic (Saudi Arabia often used as generic)
-    case 'ua': return '🇺🇦'; // Ukrainian
-    case 'th': return '🇹🇭'; // Thai
-    case 'bg': return '🇧🇬'; // Bulgarian
-    case 'tr': return '🇹🇷'; // Turkish
-    case 'vi': return '🇻🇳'; // Vietnamese
-    case 'hr': return '🇭🇷'; // Croatian
-    case 'jp': return '🇯🇵'; // Japanese
-    case 'cn': return '🇨🇳'; // Chinese
-    case 'ca': return '🇨🇦'; // English/French (Canada)
-    case 'sv': return '🇸🇪'; // Swedish
-    case 'el': return '🇬🇷'; // Greek
-    case 'he': return '🇮🇱'; // Hebrew
-    case 'ko': return '🇰🇷'; // Korean
-    case 'sr': return '🇷🇸'; // Serbian
-    default: return langCode.toUpperCase().length === 2 ? langCode.toUpperCase() : '🏳️'; // Attempt to use 2-letter code or default
+    case 'en': return '🇬🇧';
+    case 'us': return '🇺🇸';
+    case 'de': return '🇩🇪';
+    case 'ru': return '🇷🇺';
+    case 'pl': return '🇵🇱';
+    case 'pt': return '🇵🇹';
+    case 'br': return '🇧🇷';
+    case 'es': return '🇪🇸';
+    case 'it': return '🇮🇹';
+    case 'fr': return '🇫🇷';
+    case 'nl': return '🇳🇱';
+    case 'id': return '🇮🇩';
+    case 'ro': return '🇷🇴';
+    case 'hu': return '🇭🇺';
+    case 'lt': return '🇱🇹';
+    case 'cz': return '🇨🇿';
+    case 'ar': return '🇸🇦';
+    case 'ua': return '🇺🇦';
+    case 'th': return '🇹🇭';
+    case 'bg': return '🇧🇬';
+    case 'tr': return '🇹🇷';
+    case 'vi': return '🇻🇳';
+    case 'hr': return '🇭🇷';
+    case 'jp': return '🇯🇵';
+    case 'cn': return '🇨🇳';
+    case 'ca': return '🇨🇦';
+    case 'sv': return '🇸🇪';
+    case 'el': return '🇬🇷';
+    case 'he': return '🇮🇱';
+    case 'ko': return '🇰🇷';
+    case 'sr': return '🇷🇸';
+    default: return langCode.toUpperCase().length === 2 && /^[A-Z]{2}$/.test(langCode.toUpperCase()) ? langCode.toUpperCase().split('').map(char => String.fromCodePoint(char.charCodeAt(0) + 127397)).join('') : '🏳️';
   }
 }
-
 
 interface ServerListClientProps {
   initialServers: ServerInfo[];
@@ -58,38 +58,65 @@ interface ServerListClientProps {
 
 export function ServerListClient({ initialServers }: ServerListClientProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
   const [gamemodeFilter, setGamemodeFilter] = useState('all');
   const [sortBy, setSortBy] = useState('default');
   const [processedServers, setProcessedServers] = useState<ServerInfo[]>([]);
+  const [specificServerResult, setSpecificServerResult] = useState<ServerInfo | 'loading' | 'notfound' | 'error' | null>(null);
 
   useEffect(() => {
-    // Process country flags once when initialServers change
     setProcessedServers(
       initialServers.map(server => ({
         ...server,
-        countryFlag: getCountryFlagEmoji(server.countryFlag || ''), // countryFlag from API is lang code
+        countryFlag: getCountryFlagEmoji(server.countryFlag || ''),
       }))
     );
   }, [initialServers]);
 
-  const filteredAndSortedServers = useMemo(() => {
-    let servers = [...processedServers];
+  useEffect(() => {
+    const ipPortPattern = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$/;
+    if (ipPortPattern.test(debouncedSearchTerm)) {
+      setSpecificServerResult('loading');
+      fetchServerByIp(debouncedSearchTerm).then(server => {
+        if (server) {
+          const serverWithProcessedFlag = {
+            ...server,
+            countryFlag: getCountryFlagEmoji(server.countryFlag || ''),
+          };
+          setSpecificServerResult(serverWithProcessedFlag);
+        } else {
+          setSpecificServerResult('notfound');
+        }
+      }).catch(() => {
+        setSpecificServerResult('error');
+      });
+    } else {
+      setSpecificServerResult(null); 
+    }
+  }, [debouncedSearchTerm]);
 
-    // Apply search term
-    if (searchTerm) {
-      const lowerSearchTerm = searchTerm.toLowerCase();
+  const displayedServers = useMemo(() => {
+    if (specificServerResult && typeof specificServerResult === 'object' && specificServerResult !== null) {
+      return [specificServerResult];
+    }
+    if (specificServerResult === 'loading' || specificServerResult === 'error' || specificServerResult === 'notfound') {
+      return [];
+    }
+
+    let servers = [...processedServers];
+    const lowerSearchTerm = searchTerm.toLowerCase();
+
+    if (searchTerm && !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$/.test(searchTerm)) {
       servers = servers.filter(server =>
         server.name.toLowerCase().includes(lowerSearchTerm) ||
         server.ip.toLowerCase().includes(lowerSearchTerm)
       );
     }
-
-    // Apply gamemode filter
+    
     if (gamemodeFilter !== 'all') {
       servers = servers.filter(server => server.mode.toLowerCase().includes(gamemodeFilter.toLowerCase()));
     }
 
-    // Apply sorting
     if (sortBy === 'mostPlayers') {
       servers.sort((a, b) => b.players - a.players);
     } else if (sortBy === 'fewestPlayers') {
@@ -99,43 +126,41 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
     } else if (sortBy === 'nameZA') {
       servers.sort((a, b) => b.name.localeCompare(a.name));
     }
-    // 'default' sort is the initial order from API (or after processing)
-
     return servers;
-  }, [processedServers, searchTerm, gamemodeFilter, sortBy]);
+  }, [processedServers, searchTerm, gamemodeFilter, sortBy, specificServerResult]);
 
   const uniqueGamemodes = useMemo(() => {
     const modes = new Set(initialServers.map(s => s.mode.trim()).filter(m => m));
     return Array.from(modes).sort((a,b) => a.localeCompare(b));
   }, [initialServers]);
 
-
-  let captionText = "List of SA-MP servers.";
-  if (initialServers.length === 0) {
-    captionText = "No servers found or API is currently unavailable. Please try again later.";
-  } else if (filteredAndSortedServers.length === 0 && initialServers.length > 0) {
-    captionText = "No servers match your current search/filter criteria.";
-  } else {
-    captionText = `Displaying ${filteredAndSortedServers.length} of ${initialServers.length} fetched servers. Data refreshes periodically.`;
-  }
-  if (initialServers.length >= 200 && filteredAndSortedServers.length === initialServers.length && searchTerm === '' && gamemodeFilter === 'all') {
-      captionText = `Displaying the first ${initialServers.length} servers from the API. Refine your search or use filters to see more specific results. Data refreshes periodically.`;
-  }
-
+  const tableCaption = useMemo(() => {
+    if (specificServerResult === 'loading') return `Mencari detail untuk ${debouncedSearchTerm}...`;
+    if (specificServerResult === 'notfound') return `Server ${debouncedSearchTerm} tidak ditemukan. Coba pencarian umum atau periksa kembali IP:Port.`;
+    if (specificServerResult === 'error') return `Gagal mengambil detail untuk ${debouncedSearchTerm}.`;
+    if (typeof specificServerResult === 'object' && specificServerResult !== null) return `Menampilkan detail untuk server ${specificServerResult.ip}:${specificServerResult.port}.`;
+    
+    if (initialServers.length === 0) return "Tidak ada server yang ditemukan atau API tidak tersedia. Silakan coba lagi nanti.";
+    if (displayedServers.length === 0 && searchTerm) return "Tidak ada server yang cocok dengan kriteria pencarian/filter Anda.";
+    if (displayedServers.length === 0 && gamemodeFilter !== 'all') return "Tidak ada server yang cocok dengan filter gamemode Anda.";
+    if (initialServers.length >= 200 && displayedServers.length === initialServers.length && !searchTerm && gamemodeFilter === 'all') {
+      return `Menampilkan ${initialServers.length} server pertama dari API. Persempit pencarian atau gunakan filter untuk hasil yang lebih spesifik. Data diperbarui secara berkala.`;
+    }
+    return `Menampilkan ${displayedServers.length} dari ${initialServers.length} server yang diambil. Data diperbarui secara berkala.`;
+  }, [specificServerResult, debouncedSearchTerm, initialServers.length, displayedServers.length, searchTerm, gamemodeFilter]);
 
   return (
     <>
-      {/* Search and Filter Section */}
       <div className="mb-8 p-6 bg-card rounded-lg shadow-md">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 items-end">
           <div className="space-y-1">
-            <Label htmlFor="server-search" className="text-sm font-medium text-foreground/80">Search Servers</Label>
+            <Label htmlFor="server-search" className="text-sm font-medium text-foreground/80">Cari Server</Label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                 id="server-search"
                 type="text"
-                placeholder="Search by name or IP..."
+                placeholder="Cari berdasarkan nama atau IP:Port..."
                 className="pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -143,63 +168,58 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
             </div>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="gamemode-filter" className="text-sm font-medium text-foreground/80">Filter by Gamemode</Label>
-            <Select value={gamemodeFilter} onValueChange={setGamemodeFilter}>
+            <Label htmlFor="gamemode-filter" className="text-sm font-medium text-foreground/80">Filter Gamemode</Label>
+            <Select value={gamemodeFilter} onValueChange={setGamemodeFilter} disabled={specificServerResult !== null && typeof specificServerResult !== 'string'}>
               <SelectTrigger id="gamemode-filter">
-                <SelectValue placeholder="All Gamemodes" />
+                <SelectValue placeholder="Semua Gamemode" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Gamemodes</SelectItem>
+                <SelectItem value="all">Semua Gamemode</SelectItem>
                 {uniqueGamemodes.map(mode => (
                   <SelectItem key={mode} value={mode}>{mode}</SelectItem>
                 ))}
-                {/* Fallback options if uniqueGamemodes is empty or for common modes */}
                 {uniqueGamemodes.length === 0 && (
                   <>
                     <SelectItem value="Roleplay">Roleplay</SelectItem>
                     <SelectItem value="Freeroam">Freeroam</SelectItem>
-                    <SelectItem value="DM">Deathmatch</SelectItem>
-                    <SelectItem value="Race">Racing/Drift</SelectItem>
-                    <SelectItem value="Cops and Robbers">Cops & Robbers</SelectItem>
                   </>
                 )}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="sort-by" className="text-sm font-medium text-foreground/80">Sort By</Label>
-            <Select value={sortBy} onValueChange={setSortBy}>
+            <Label htmlFor="sort-by" className="text-sm font-medium text-foreground/80">Urutkan Berdasarkan</Label>
+            <Select value={sortBy} onValueChange={setSortBy} disabled={specificServerResult !== null && typeof specificServerResult !== 'string'}>
               <SelectTrigger id="sort-by">
                 <SelectValue placeholder="Default" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="default">Default</SelectItem>
-                <SelectItem value="mostPlayers">Most Players</SelectItem>
-                <SelectItem value="fewestPlayers">Fewest Players</SelectItem>
-                <SelectItem value="nameAZ">Server Name (A-Z)</SelectItem>
-                <SelectItem value="nameZA">Server Name (Z-A)</SelectItem>
+                <SelectItem value="mostPlayers">Pemain Terbanyak</SelectItem>
+                <SelectItem value="fewestPlayers">Pemain Paling Sedikit</SelectItem>
+                <SelectItem value="nameAZ">Nama Server (A-Z)</SelectItem>
+                <SelectItem value="nameZA">Nama Server (Z-A)</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
       </div>
 
-      {/* Server List Table */}
       <div className="bg-card rounded-lg shadow-md overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[50px] text-center"><Wifi className="inline-block h-5 w-5 text-muted-foreground" /></TableHead>
-              <TableHead><ServerIcon className="inline-block h-5 w-5 mr-1 text-muted-foreground" /> Server Name</TableHead>
-              <TableHead><MapPin className="inline-block h-5 w-5 mr-1 text-muted-foreground" /> IP Address</TableHead>
-              <TableHead className="text-center"><Users className="inline-block h-5 w-5 mr-1 text-muted-foreground" /> Players</TableHead>
+              <TableHead><ServerIcon className="inline-block h-5 w-5 mr-1 text-muted-foreground" /> Nama Server</TableHead>
+              <TableHead><MapPin className="inline-block h-5 w-5 mr-1 text-muted-foreground" /> Alamat IP</TableHead>
+              <TableHead className="text-center"><Users className="inline-block h-5 w-5 mr-1 text-muted-foreground" /> Pemain</TableHead>
               <TableHead>Gamemode</TableHead>
-              <TableHead className="text-right">Action</TableHead>
+              <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredAndSortedServers.length > 0 ? (
-              filteredAndSortedServers.map((server) => (
+            {displayedServers.length > 0 ? (
+              displayedServers.map((server) => (
                 <TableRow key={server.id} className="hover:bg-muted/50 transition-colors">
                   <TableCell className="text-center">
                     <Badge variant={server.isOnline ? "default" : "destructive"} className={server.isOnline ? "bg-green-500 hover:bg-green-600 text-white" : "bg-red-500 hover:bg-red-600 text-white"}>
@@ -217,13 +237,10 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
                   </TableCell>
                   <TableCell className="text-right">
                     <Button asChild variant="outline" size="sm" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
-                      {/* For actual connection: <a href={`samp://${server.ip}:${server.port}`}>Connect</a> */}
                       <a href={`samp://${server.ip}:${server.port}`} onClick={(e) => {
-                        // Basic alert, in a real app you'd want a more robust way to handle samp:// links
-                        // or inform user if they don't have SA-MP installed.
-                        alert(`Attempting to connect to samp://${server.ip}:${server.port}. Ensure you have SA-MP installed and configured to handle samp:// links.`);
+                        alert(`Mencoba menghubungkan ke samp://${server.ip}:${server.port}. Pastikan Anda telah menginstal SA-MP dan mengkonfigurasinya untuk menangani tautan samp://.`);
                       }}>
-                        Connect
+                        Hubungkan
                       </a>
                     </Button>
                   </TableCell>
@@ -232,12 +249,19 @@ export function ServerListClient({ initialServers }: ServerListClientProps) {
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                  {initialServers.length > 0 ? "No servers match your criteria." : "Fetching server data or no servers available..."}
+                  {(() => {
+                    if (specificServerResult === 'loading') return `Mencari detail untuk ${debouncedSearchTerm}...`;
+                    if (specificServerResult === 'notfound') return `Server ${debouncedSearchTerm} tidak ditemukan. Coba pencarian umum.`;
+                    if (specificServerResult === 'error') return `Gagal mengambil detail untuk ${debouncedSearchTerm}.`;
+                    if (initialServers.length === 0 && specificServerResult === null) return "Tidak ada server yang ditemukan atau API tidak tersedia.";
+                    if (specificServerResult === null && (searchTerm || gamemodeFilter !== 'all')) return "Tidak ada server yang cocok dengan kriteria Anda.";
+                    return "Memuat data server..."; 
+                  })()}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
-          <TableCaption>{captionText}</TableCaption>
+          <TableCaption>{tableCaption}</TableCaption>
         </Table>
       </div>
     </>
