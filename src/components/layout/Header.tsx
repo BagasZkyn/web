@@ -1,37 +1,36 @@
-'use client' 
+'use client'
 
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import { Logo } from '@/components/shared/Logo';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, Home, Download, Info, Newspaper, Server, LogIn, UserPlus } from 'lucide-react';
-import { ThemeToggle } from '@/components/shared/ThemeToggle';
-
-const [user, setUser] = useState(null)
-
-useEffect(() => {
-  supabase.auth.getUser().then(({ data }) => setUser(data.user))
-}, [])
-
-const navItems = [
-  { href: '/', label: 'Home', icon: Home },
-  { href: '/downloads', label: 'Downloads', icon: Download },
-  { href: '/about', label: 'About', icon: Info },
-  { href: '/news', label: 'News', icon: Newspaper },
-  { href: '/servers', label: 'Servers', icon: Server },
-]
-
-if (user) {
-  navItems.push({ href: '/profile', label: 'Account', icon: Info })
-} else {
-  navItems.push({ href: '/auth/login', label: 'Login', icon: LogIn })
-  navItems.push({ href: '/auth/register', label: 'Register', icon: UserPlus })
-}
-
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+import { Logo } from '@/components/shared/Logo'
+import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { Menu, Home, Download, Info, Newspaper, Server, LogIn, UserPlus } from 'lucide-react'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
 
 export function Header() {
+  const [user, setUser] = useState<any>(null)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+  }, [])
+
+  const navItems = [
+    { href: '/', label: 'Home', icon: Home },
+    { href: '/downloads', label: 'Downloads', icon: Download },
+    { href: '/about', label: 'About', icon: Info },
+    { href: '/news', label: 'News', icon: Newspaper },
+    { href: '/servers', label: 'Servers', icon: Server },
+  ]
+
+  if (user) {
+    navItems.push({ href: '/profile', label: 'Account', icon: Info })
+  } else {
+    navItems.push({ href: '/auth/login', label: 'Login', icon: LogIn })
+    navItems.push({ href: '/auth/register', label: 'Register', icon: UserPlus })
+  }
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -76,5 +75,5 @@ export function Header() {
         </div>
       </div>
     </header>
-  );
+  )
 }
