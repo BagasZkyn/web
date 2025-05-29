@@ -12,15 +12,20 @@ export default function RegisterPage() {
   const [username, setUsername] = useState('')
 
   const handleRegister = async () => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { username } },
-    })
-    if (error) return alert(error.message)
-    alert('Check your email to verify your account!')
-    router.push('/auth/login')
-  }
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        username,
+        role: email === 'bzakyan@gmail.com' ? 'admin' : 'user'
+      }
+    }
+  })
+  if (error) return alert(error.message)
+  alert('Check your email to verify your account!')
+  router.push('/auth/login')
+}
 
   const registerWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({ provider: 'google' })
