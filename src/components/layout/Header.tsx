@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Logo } from '@/components/shared/Logo';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, Home, Download, Info, Newspaper, Server } from 'lucide-react';
+import { Menu, Home, Download, Info, Newspaper, Server, LogIn, UserPlus } from 'lucide-react';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 
 const navItems = [
