@@ -1,8 +1,8 @@
 'use client' 
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 import { Logo } from '@/components/shared/Logo';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
