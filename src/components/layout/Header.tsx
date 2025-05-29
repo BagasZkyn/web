@@ -11,6 +11,8 @@ const navItems = [
   { href: '/about', label: 'About', icon: Info },
   { href: '/news', label: 'News', icon: Newspaper },
   { href: '/servers', label: 'Servers', icon: Server },
+  { href: '/auth/login', label: 'Login', icon: LogIn },       // ← Tambahkan ini
+  { href: '/auth/register', label: 'Register', icon: UserPlus }
 ];
 
 export function Header() {
